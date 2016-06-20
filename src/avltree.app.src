@@ -1,0 +1,14 @@
+{application, avltree,
+ [
+  {description, "An Erlang avltree library"},
+  {vsn, "1"},
+  {modules, [
+             avltree
+            ]},
+  {registered, []},
+  {applications, [
+                  kernel,
+                  stdlib
+                 ]},
+  {env, []}
+ ]}.
