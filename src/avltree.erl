@@ -28,9 +28,14 @@
         , new/1
         , insert/2
         , delete/2
-        , prev/1
-        , mid/1
+        , look/2
         , last/1
+        , first/1
+        , prev/2
+        , next/2
+        , prev_traverse/1
+        , mid_traverse/1
+        , last_traverse/1
         , is_avl/1
         ]).
 
@@ -94,40 +99,104 @@ delete(#node{ root = Root
                         delete_left)
     end.
 
-prev(?undef) -> [];
-prev(#node{root = Root, left = ?undef, right = ?undef}) ->
-    [Root];
-prev(#node{root = Root, left = ?undef, right = Right}) ->
-    [Root | prev(Right)];
-prev(#node{root = Root, left = Left, right = ?undef}) ->
-    [Root | prev(Left)];
-prev(#node{root = Root, left = Left, right = Right}) ->
-    [Root] ++ prev(Left) ++ prev(Right).
-
-mid(?undef) -> [];
-mid(#node{root = Root, left = Left, right = Right}) ->
-    case {Left, Right} of
-        {?undef, ?undef} ->
-            [Root];
-        {?undef, _} ->
-            [Root | mid(Right)];
-        {_, ?undef} ->
-            mid(Left) ++ [Root];
-        _ ->
-            mid(Left) ++ [Root] ++ mid(Right)
+look(T, _) when T == ?empty_tree; T == ?undef -> [];
+look(#node{ root = Root
+          , left = Left
+          , right = Right
+          , rootvalue = RootValue}, Key) ->
+    if
+        Key == Root ->
+            [{Key, RootValue}];
+        Key > Root ->
+            look(Right, Key);
+        Key < Root ->
+            look(Left, Key)
     end.
 
-last(?undef) -> [];
-last(#node{root = Root, left = Left, right = Right}) ->
+last(T) when T == ?empty_tree; T == ?undef -> '$end_of_tree';
+last(#node{root = Root, right = ?undef})   -> Root;
+last(#node{right = Right})                 -> last(Right).
+
+first(T) when T == ?empty_tree; T == ?undef -> '$end_of_tree';
+first(#node{root = Root, left = ?undef})    -> Root;
+first(#node{left = Left})                   -> first(Left).
+
+next(T, _) when T == ?empty_tree; T == ?undef -> '$end_of_tree';
+next(#node{ root = Root
+          , left = Left
+          , right = Right
+          , rootvalue = RootValue}, Key) ->
+    if
+        Key == Root ->
+            {Root, RootValue};
+        Key > Root ->
+            next(Right, Key);
+        Key < Root andalso Left == ?undef ->
+            {Root, RootValue};
+        Key < Root ->
+            case last(Left) < Key of
+                true ->
+                    {Root, RootValue};
+                false ->
+                    next(Left, Key)
+            end
+    end.
+
+prev(T, _) when T == ?empty_tree; T == ?undef -> '$end_of_tree';
+prev(#node{ root = Root
+          , left = Left
+          , right = Right
+          , rootvalue = RootValue}, Key) ->
+    if
+        Key == Root ->
+            {Root, RootValue};
+        Key < Root ->
+            prev(Left, Key);
+        Key > Root andalso Right == ?undef ->
+            {Root, RootValue};
+        Key > Root ->
+            case first(Right) > Key of
+                true ->
+                    {Root, RootValue};
+                false ->
+                    prev(Right, Key)
+            end
+    end.
+
+prev_traverse(?undef) -> [];
+prev_traverse(#node{root = Root, left = ?undef, right = ?undef}) ->
+    [Root];
+prev_traverse(#node{root = Root, left = ?undef, right = Right}) ->
+    [Root | prev_traverse(Right)];
+prev_traverse(#node{root = Root, left = Left, right = ?undef}) ->
+    [Root | prev_traverse(Left)];
+prev_traverse(#node{root = Root, left = Left, right = Right}) ->
+    [Root] ++ prev_traverse(Left) ++ prev_traverse(Right).
+
+mid_traverse(?undef) -> [];
+mid_traverse(#node{root = Root, left = Left, right = Right}) ->
     case {Left, Right} of
         {?undef, ?undef} ->
             [Root];
         {?undef, _} ->
-            last(Right) ++ [Root];
+            [Root | mid_traverse(Right)];
         {_, ?undef} ->
-            last(Left) ++ [Root];
+            mid_traverse(Left) ++ [Root];
         _ ->
-            last(Left) ++ last(Right) ++ [Root]
+            mid_traverse(Left) ++ [Root] ++ mid_traverse(Right)
+    end.
+
+last_traverse(?undef) -> [];
+last_traverse(#node{root = Root, left = Left, right = Right}) ->
+    case {Left, Right} of
+        {?undef, ?undef} ->
+            [Root];
+        {?undef, _} ->
+            last_traverse(Right) ++ [Root];
+        {_, ?undef} ->
+            last_traverse(Left) ++ [Root];
+        _ ->
+            last_traverse(Left) ++ last_traverse(Right) ++ [Root]
     end.
 
 is_avl(T) when T == ?empty_tree; T == ?undef -> true;
@@ -298,120 +367,115 @@ is_binarysearchtree(#node{left = Left,
 -include_lib("eunit/include/eunit.hrl").
 
 avltree_test_() ->
-  [ {"insert", timeout, 10,
-      fun() ->
-         [lists:foldl(fun({Key, Value}, Acc) ->
-                          X = insert(Acc, {Key, Value}),
-                          ?assertEqual(true, is_avl(X)),
-                          X
-                      end,
-                      new(),
-                      [begin T = rand:uniform(16), {T, T} end
-                       || _ <- lists:seq(1, 100)])
-          || _ <- lists:seq(1, 1000)]
-       end}
-  , {"prev/mid/last",
-       fun() ->
-         A = [{3,a},
-              {2,a},
-              {1,a},
-              {4,a},
-              {5,a},
-              {6,a},
-              {7,a},
-              {16,a},
-              {15,a},
-              {14,a},
-              {13,a},
-              {12,a},
-              {11,a},
-              {10,a},
-              {8,a},
-              {9,a}],
-         Tree = new(A),
-         ?assertEqual([7,4,2,1,3,6,5,13,11,9,8,10,12,15,14,16], prev(Tree)),
-         ?assertEqual([1,3,2,5,6,4,8,10,9,12,11,14,16,15,13,7], last(Tree)),
-         ?assertEqual([1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16], mid(Tree))
-       end}
-  , {"deletemin",
-       fun() ->
-         A = [{3,a},
-              {2,a},
-              {1,a},
-              {4,a},
-              {5,a},
-              {6,a},
-              {7,a},
-              {16,a},
-              {15,a},
-              {14,a},
-              {13,a},
-              {12,a},
-              {11,a},
-              {10,a},
-              {8,a},
-              {9,a}],
-         Tree = T00 = new(A),
-         T01 = deletemin(T00), ?assertEqual(true, is_avl(T01)),
-         T02 = deletemin(T01), ?assertEqual(true, is_avl(T02)),
-         T03 = deletemin(T02), ?assertEqual(true, is_avl(T03)),
-         T04 = deletemin(T03), ?assertEqual(true, is_avl(T04)),
-         T05 = deletemin(T04), ?assertEqual(true, is_avl(T05)),
-         T06 = deletemin(T05), ?assertEqual(true, is_avl(T06)),
-         T07 = deletemin(T06), ?assertEqual(true, is_avl(T07)),
-         T08 = deletemin(T07), ?assertEqual(true, is_avl(T08)),
-         T09 = deletemin(T08), ?assertEqual(true, is_avl(T09)),
-         T10 = deletemin(T09), ?assertEqual(true, is_avl(T10)),
-         T11 = deletemin(T10), ?assertEqual(true, is_avl(T11)),
-         T12 = deletemin(T11), ?assertEqual(true, is_avl(T12)),
-         T13 = deletemin(T12), ?assertEqual(true, is_avl(T13)),
-         T14 = deletemin(T13), ?assertEqual(true, is_avl(T14)),
-         T15 = deletemin(T14), ?assertEqual(true, is_avl(T15)),
-         T16 = deletemin(T15), ?assertEqual(true, is_avl(T16)),
-         ?assertEqual(mid(T01), lists:nthtail(1 , mid(Tree))),
-         ?assertEqual(mid(T02), lists:nthtail(2 , mid(Tree))),
-         ?assertEqual(mid(T03), lists:nthtail(3 , mid(Tree))),
-         ?assertEqual(mid(T04), lists:nthtail(4 , mid(Tree))),
-         ?assertEqual(mid(T05), lists:nthtail(5 , mid(Tree))),
-         ?assertEqual(mid(T06), lists:nthtail(6 , mid(Tree))),
-         ?assertEqual(mid(T07), lists:nthtail(7 , mid(Tree))),
-         ?assertEqual(mid(T08), lists:nthtail(8 , mid(Tree))),
-         ?assertEqual(mid(T09), lists:nthtail(9 , mid(Tree))),
-         ?assertEqual(mid(T10), lists:nthtail(10, mid(Tree))),
-         ?assertEqual(mid(T11), lists:nthtail(11, mid(Tree))),
-         ?assertEqual(mid(T12), lists:nthtail(12, mid(Tree))),
-         ?assertEqual(mid(T13), lists:nthtail(13, mid(Tree))),
-         ?assertEqual(mid(T14), lists:nthtail(14, mid(Tree))),
-         ?assertEqual(mid(T15), lists:nthtail(15, mid(Tree))),
-         ?assertEqual(mid(T16), lists:nthtail(16, mid(Tree)))
-       end}
-  , {"delete",
-       fun() ->
-         A = [{3,a},
-              {2,a},
-              {1,a},
-              {4,a},
-              {5,a},
-              {6,a},
-              {7,a},
-              {16,a},
-              {15,a},
-              {14,a},
-              {13,a},
-              {12,a},
-              {11,a},
-              {10,a},
-              {8,a},
-              {9,a}],
-         TT00 = new(A),
-         [lists:foldl(fun(K, T) ->
-                          NewT = delete(T, K),
-                          ?assertEqual(true, is_avl(NewT)),
-                          NewT
-                      end,
-                      TT00, [rand:uniform(16) || _ <- lists:seq(1, 100)])
-          || _ <- lists:seq(1, 1000)]
-       end}
+    [ {"insert", timeout, 10,
+        fun() ->
+            [lists:foldl(fun({Key, Value}, Acc) ->
+                             X = insert(Acc, {Key, Value}),
+                             ?assertEqual(true, is_avl(X)),
+                             X
+                         end,
+                         new(),
+                         [begin T = rand:uniform(16), {T, T} end
+                          || _ <- lists:seq(1, 100)])
+             || _ <- lists:seq(1, 100)]
+        end}
+    , {"prev/mid/last",
+        fun() ->
+            A = [{3,a}, {2,a}, {1,a}, {4,a}, {5,a}, {6,a}, {7,a}, {16,a},
+                 {15,a}, {14,a}, {13,a}, {12,a}, {11,a}, {10,a}, {8,a}, {9,a}],
+            Tree = new(A),
+            ?assertEqual([7,4,2,1,3,6,5,13,11,9,8,10,12,15,14,16], prev_traverse(Tree)),
+            ?assertEqual([1,3,2,5,6,4,8,10,9,12,11,14,16,15,13,7], last_traverse(Tree)),
+            ?assertEqual([1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16], mid_traverse(Tree))
+        end}
+    , {"deletemin",
+        fun() ->
+            A = [{3,a}, {2,a}, {1,a}, {4,a}, {5,a}, {6,a}, {7,a}, {16,a},
+                 {15,a}, {14,a}, {13,a}, {12,a}, {11,a}, {10,a}, {8,a}, {9,a}],
+            Tree = T00 = new(A),
+            T01 = deletemin(T00), ?assertEqual(true, is_avl(T01)),
+            T02 = deletemin(T01), ?assertEqual(true, is_avl(T02)),
+            T03 = deletemin(T02), ?assertEqual(true, is_avl(T03)),
+            T04 = deletemin(T03), ?assertEqual(true, is_avl(T04)),
+            T05 = deletemin(T04), ?assertEqual(true, is_avl(T05)),
+            T06 = deletemin(T05), ?assertEqual(true, is_avl(T06)),
+            T07 = deletemin(T06), ?assertEqual(true, is_avl(T07)),
+            T08 = deletemin(T07), ?assertEqual(true, is_avl(T08)),
+            T09 = deletemin(T08), ?assertEqual(true, is_avl(T09)),
+            T10 = deletemin(T09), ?assertEqual(true, is_avl(T10)),
+            T11 = deletemin(T10), ?assertEqual(true, is_avl(T11)),
+            T12 = deletemin(T11), ?assertEqual(true, is_avl(T12)),
+            T13 = deletemin(T12), ?assertEqual(true, is_avl(T13)),
+            T14 = deletemin(T13), ?assertEqual(true, is_avl(T14)),
+            T15 = deletemin(T14), ?assertEqual(true, is_avl(T15)),
+            T16 = deletemin(T15), ?assertEqual(true, is_avl(T16)),
+            ?assertEqual(mid_traverse(T01), lists:nthtail(1 , mid_traverse(Tree))),
+            ?assertEqual(mid_traverse(T02), lists:nthtail(2 , mid_traverse(Tree))),
+            ?assertEqual(mid_traverse(T03), lists:nthtail(3 , mid_traverse(Tree))),
+            ?assertEqual(mid_traverse(T04), lists:nthtail(4 , mid_traverse(Tree))),
+            ?assertEqual(mid_traverse(T05), lists:nthtail(5 , mid_traverse(Tree))),
+            ?assertEqual(mid_traverse(T06), lists:nthtail(6 , mid_traverse(Tree))),
+            ?assertEqual(mid_traverse(T07), lists:nthtail(7 , mid_traverse(Tree))),
+            ?assertEqual(mid_traverse(T08), lists:nthtail(8 , mid_traverse(Tree))),
+            ?assertEqual(mid_traverse(T09), lists:nthtail(9 , mid_traverse(Tree))),
+            ?assertEqual(mid_traverse(T10), lists:nthtail(10, mid_traverse(Tree))),
+            ?assertEqual(mid_traverse(T11), lists:nthtail(11, mid_traverse(Tree))),
+            ?assertEqual(mid_traverse(T12), lists:nthtail(12, mid_traverse(Tree))),
+            ?assertEqual(mid_traverse(T13), lists:nthtail(13, mid_traverse(Tree))),
+            ?assertEqual(mid_traverse(T14), lists:nthtail(14, mid_traverse(Tree))),
+            ?assertEqual(mid_traverse(T15), lists:nthtail(15, mid_traverse(Tree))),
+         ?assertEqual(mid_traverse(T16), lists:nthtail(16, mid_traverse(Tree)))
+        end}
+    , {"delete",
+        fun() ->
+            A = [{3,a}, {2,a}, {1,a}, {4,a}, {5,a}, {6,a}, {7,a}, {16,a},
+                 {15,a}, {14,a}, {13,a}, {12,a}, {11,a}, {10,a}, {8,a}, {9,a}],
+            TT00 = new(A),
+            [lists:foldl(fun(K, T) ->
+                             NewT = delete(T, K),
+                             ?assertEqual(true, is_avl(NewT)),
+                             NewT
+                         end,
+                         TT00, [rand:uniform(16) || _ <- lists:seq(1, 100)])
+             || _ <- lists:seq(1, 1000)]
+        end}
+    , {"look/2",
+        fun() ->
+            A = [{3,a}, {2,a}, {1,a}, {4,a}, {5,a}, {6,a}, {7,a}, {16,a},
+                 {15,a}, {14,a}, {13,a}, {12,a}, {11,a}, {10,a}, {8,a}, {9,a}],
+            Tree = new(A),
+            [?assertEqual([{X, a}], look(Tree, X)) || X <- lists:seq(1, 16)],
+            ?assertEqual([], look(Tree, 0)),
+            ?assertEqual([], look(?empty_tree, 0)),
+            ?assertEqual([], look(?undef, 0))
+        end}
+    , {"first/1",
+        fun() ->
+            A = [{3,a}, {2,a}, {1,a}, {4,a}, {5,a}, {6,a}, {7,a}, {16,a},
+                 {15,a}, {14,a}, {13,a}, {12,a}, {11,a}, {10,a}, {8,a}, {9,a}],
+            Tree = new(A),
+            ?assertEqual(1, first(Tree)),
+            ?assertEqual('$end_of_tree', first(?undef)),
+            ?assertEqual('$end_of_tree', first(?empty_tree))
+        end}
+    , {"last/1",
+        fun() ->
+            A = [{3,a}, {2,a}, {1,a}, {4,a}, {5,a}, {6,a}, {7,a}, {16,a},
+                 {15,a}, {14,a}, {13,a}, {12,a}, {11,a}, {10,a}, {8,a}, {9,a}],
+            Tree = new(A),
+            ?assertEqual(16, last(Tree)),
+            ?assertEqual('$end_of_tree', last(?undef)),
+            ?assertEqual('$end_of_tree', last(?empty_tree))
+        end}
+    , {"next/2",
+        fun() ->
+            A = [{3,a}, {2,a}, {1,a}, {4,a}, {5,a}, {6,a}, {7,a}, {16,a},
+                 {15,a}, {14,a}, {13,a}, {12,a}, {11,a}, {10,a}, {8,a}, {9,a}],
+            Tree = new(A),
+            ?assertEqual({1, a}, next(Tree, 0)),
+            ?assertEqual({1, a}, next(Tree, 1)),
+            ?assertEqual('$end_of_tree', next(Tree, 17))
+        end}
   ].
 
 -endif.
