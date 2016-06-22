@@ -37,6 +37,8 @@
         , mid_traverse/1
         , last_traverse/1
         , is_avl/1
+        , is_empty/1
+        , tree_size/1
         ]).
 
 %%%*_ MACROS and SPECS =========================================================
@@ -46,7 +48,14 @@
         #node{root = ?undef, left = ?undef, right = ?undef,
               rootvalue = ?undef, height = 0}).
 
--record(node, {root, left, right, rootvalue, height = 0}).
+-record(node, { root
+              , left
+              , right
+              , rootvalue
+              , height = 0
+              , lchild = 0
+              , rchild = 0
+              }).
 
 -type tree() :: #node{} | ?undef.
 
@@ -66,16 +75,21 @@ insert(OldTree, {Key, Value}) when OldTree == ?empty_tree; OldTree == ?undef ->
     #node{root = Key, rootvalue = Value, height = 1};
 insert(#node{ root = Root
             , left = Left
-            , right = Right} = OldTree,
+            , right = Right
+            , lchild = LSize
+            , rchild = RSize
+            } = OldTree,
        {Key, Value}) ->
     if
         Key == Root ->
             OldTree#node{rootvalue = Value};
         Key < Root ->
-            update_tree(OldTree#node{left = insert(Left, {Key, Value})},
+            update_tree(OldTree#node{left = insert(Left, {Key, Value}),
+                                     lchild = LSize + 1},
                         Key, insert_left);
         Key > Root ->
-            update_tree(OldTree#node{right = insert(Right, {Key, Value})},
+            update_tree(OldTree#node{right = insert(Right, {Key, Value}),
+                                     rchild = RSize + 1},
                         Key, insert_right)
     end.
 
@@ -84,6 +98,8 @@ delete(T, _) when T == ?empty_tree; T == ?undef -> T;
 delete(#node{ root = Root
             , left = Left
             , right = Right
+            , lchild = LSize
+            , rchild = RSize
             } = OldTree,
        Key) ->
     if
@@ -94,14 +110,18 @@ delete(#node{ root = Root
                     {NewRoot, NewRootValue} = get_min(Right),
                     update_tree(OldTree#node{ root = NewRoot
                                             , right = deletemin(Right)
-                                            , rootvalue = NewRootValue},
+                                            , rootvalue = NewRootValue
+                                            , rchild = RSize - 1
+                                            },
                                 delete_right)
             end;
         Key > Root ->
-            update_tree(OldTree#node{right = delete(Right, Key)},
+            update_tree(OldTree#node{right = delete(Right, Key),
+                                     rchild = RSize - 1},
                         delete_right);
         Key < Root ->
-            update_tree(OldTree#node{left = delete(Left, Key)},
+            update_tree(OldTree#node{left = delete(Left, Key),
+                                     lchild = LSize - 1},
                         delete_left)
     end.
 
@@ -220,6 +240,15 @@ is_avl(#node{left = Left, right = Right} = Tree) ->
         andalso erlang:abs(height(Left) - height(Right)) =< 1
         andalso is_avl(Left) andalso is_avl(Right).
 
+-spec is_empty(tree()) -> boolean().
+is_empty(T) when T == ?empty_tree; T == ?undef -> true;
+is_empty(_)                                    -> false.
+
+-spec tree_size(tree()) -> non_neg_integer().
+tree_size(T) when T == ?empty_tree; T == ?undef -> 0;
+tree_size(#node{rchild = R, lchild = L}) ->
+    R + L + 1.
+
 %%%*_ PRIVATE FUNCTIONS ========================================================
 
 update_tree(#node{ left = Left
@@ -261,13 +290,17 @@ get_min(#node{left = Left}) ->
 
 deletemin(?empty_tree = T) -> T;
 deletemin(#node{left = ?undef, right = Right}) -> Right;
-deletemin(#node{left = Left} = OldTree) ->
+deletemin(#node{left = Left, lchild = LSize} = OldTree) ->
     case Left#node.left of
         ?undef ->
             %% found min
-            update_tree(OldTree#node{left = Left#node.right}, delete_left);
+            update_tree(OldTree#node{left = Left#node.right,
+                                     lchild = tree_size(Left#node.right)},
+                        delete_left);
         _ ->
-            update_tree(OldTree#node{left = deletemin(Left)}, delete_left)
+            update_tree(OldTree#node{left = deletemin(Left),
+                                     lchild = LSize - 1},
+                        delete_left)
     end.
 
 update_tree(#node{ left = Left
@@ -311,8 +344,9 @@ update_tree(#node{ left = Left
 %%             0               0   3   5
 %%
 left_left_rotation(#node{left = OldLeft} = OldTree) ->
-    NewRight = update_height(OldTree#node{left = OldLeft#node.right}),
-    update_height(OldLeft#node{right = NewRight}).
+    NewRight = update_height(OldTree#node{left = OldLeft#node.right,
+                                          lchild = tree_size(OldLeft#node.right)}),
+    update_height(OldLeft#node{right = NewRight, rchild = tree_size(NewRight)}).
 
 %%
 %%     1              1
@@ -324,8 +358,9 @@ left_left_rotation(#node{left = OldLeft} = OldTree) ->
 %%                          5    0   2   5
 %%
 right_right_rotation(#node{right = OldRight} = OldTree) ->
-    NewLeft = update_height(OldTree#node{right = OldRight#node.left}),
-    update_height(OldRight#node{left = NewLeft}).
+    NewLeft = update_height(OldTree#node{right = OldRight#node.left,
+                                         rchild = tree_size(OldRight#node.left)}),
+    update_height(OldRight#node{left = NewLeft, lchild = tree_size(NewLeft)}).
 
 %%
 %%     2              2               2
@@ -338,7 +373,8 @@ right_right_rotation(#node{right = OldRight} = OldTree) ->
 %%
 right_left_rotation(#node{right = OldRight} = OldTree) ->
     NewRight = left_left_rotation(OldRight),
-    right_right_rotation(OldTree#node{right = NewRight}).
+    right_right_rotation(OldTree#node{right = NewRight,
+                                      rchild = tree_size(NewRight)}).
 
 %%
 %%     8             8               8            7
@@ -351,7 +387,8 @@ right_left_rotation(#node{right = OldRight} = OldTree) ->
 %%
 left_right_rotation(#node{left = OldLeft} = OldTree) ->
     NewLeft = right_right_rotation(OldLeft),
-    left_left_rotation(OldTree#node{left = NewLeft}).
+    left_left_rotation(OldTree#node{left = NewLeft,
+                                    lchild = tree_size(NewLeft)}).
 
 update_height(#node{left = Left, right = Right} = Tree) ->
     Height = erlang:max(height(Left), height(Right)) + 1,
@@ -490,6 +527,41 @@ avltree_test_() ->
             ?assertEqual({1, a}, next(Tree, 0)),
             ?assertEqual({1, a}, next(Tree, 1)),
             ?assertEqual('$end_of_tree', next(Tree, 17))
+        end}
+    , {"is_empty/1",
+        fun() ->
+            A = [{3,a}, {2,a}, {1,a}, {4,a}, {5,a}, {6,a}, {7,a}, {16,a},
+                 {15,a}, {14,a}, {13,a}, {12,a}, {11,a}, {10,a}, {8,a}, {9,a}],
+            Tree = new(A),
+            ?assertEqual(false, is_empty(Tree)),
+            ?assertEqual(true, is_empty(?empty_tree)),
+            ?assertEqual(true, is_empty(?undef))
+        end}
+    , {"tree_size/1",
+        fun() ->
+            A = [{3,a}, {2,a}, {1,a}, {4,a}, {5,a}, {6,a}, {7,a}, {16,a},
+                 {15,a}, {14,a}, {13,a}, {12,a}, {11,a}, {10,a}, {8,a}, {9,a}],
+            TT00 = new(A),
+            ?assertEqual(0, tree_size(?empty_tree)),
+            ?assertEqual(16, tree_size(TT00)),
+            undefined = erlang:put('__TEST_COUNTER__', 16),
+            [begin
+                lists:foldl(fun(K, T) ->
+                                case look(T, K) of
+                                   [] ->
+                                       T;
+                                   _ ->
+                                       NewT = delete(T, K),
+                                       Counter = erlang:get('__TEST_COUNTER__'),
+                                       ?assertEqual(Counter - 1, tree_size(NewT)),
+                                       _ = erlang:put('__TEST_COUNTER__', Counter - 1),
+                                       NewT
+                                end
+                            end,
+                            TT00, [rand:uniform(16) || _ <- lists:seq(1, 100)]),
+                _ = erlang:put('__TEST_COUNTER__', 16)
+             end || _ <- lists:seq(1, 1000)]
+
         end}
   ].
 
