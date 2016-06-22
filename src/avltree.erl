@@ -29,6 +29,7 @@
         , insert/2
         , delete/2
         , look/2
+        , is_defined/2
         , last/1
         , first/1
         , prev/2
@@ -138,6 +139,21 @@ look(#node{ root = Root
             look(Right, Key);
         Key < Root ->
             look(Left, Key)
+    end.
+
+-spec is_defined(tree(), term()) -> boolean().
+is_defined(T, _) when T == ?empty_tree; T == ?undef -> false;
+is_defined(#node{ root = Root
+                , left = Left
+                , right = Right
+                }, Key) ->
+    if
+        Key == Root ->
+            true;
+        Key > Root ->
+            is_defined(Right, Key);
+        Key < Root ->
+            is_defined(Left, Key)
     end.
 
 -spec last(tree()) -> '$end_of_tree' | term().
