@@ -48,15 +48,20 @@
 
 -record(node, {root, left, right, rootvalue, height = 0}).
 
+-type tree() :: #node{} | ?undef.
+
 %%%*_ API FUNCTIONS ============================================================
 
+-spec new() -> tree().
 new() ->
     ?empty_tree.
 
+-spec new([{term(), term()}]) -> tree().
 new(KVList) ->
     lists:foldl(fun({Key, Value}, Acc) -> insert(Acc, {Key, Value}) end,
                 new(), KVList).
 
+-spec insert(tree(), {term(), term()}) -> tree().
 insert(OldTree, {Key, Value}) when OldTree == ?empty_tree; OldTree == ?undef ->
     #node{root = Key, rootvalue = Value, height = 1};
 insert(#node{ root = Root
@@ -74,6 +79,7 @@ insert(#node{ root = Root
                         Key, insert_right)
     end.
 
+-spec delete(tree(), term()) -> tree().
 delete(T, _) when T == ?empty_tree; T == ?undef -> T;
 delete(#node{ root = Root
             , left = Left
@@ -99,6 +105,7 @@ delete(#node{ root = Root
                         delete_left)
     end.
 
+-spec look(tree(), term()) -> [{term(), term()}].
 look(T, _) when T == ?empty_tree; T == ?undef -> [];
 look(#node{ root = Root
           , left = Left
@@ -113,14 +120,17 @@ look(#node{ root = Root
             look(Left, Key)
     end.
 
+-spec last(tree()) -> '$end_of_tree' | term().
 last(T) when T == ?empty_tree; T == ?undef -> '$end_of_tree';
 last(#node{root = Root, right = ?undef})   -> Root;
 last(#node{right = Right})                 -> last(Right).
 
+-spec first(tree()) -> '$end_of_tree' | term().
 first(T) when T == ?empty_tree; T == ?undef -> '$end_of_tree';
 first(#node{root = Root, left = ?undef})    -> Root;
 first(#node{left = Left})                   -> first(Left).
 
+-spec next(tree(), term()) -> '$end_of_tree' | {term(), term()}.
 next(T, _) when T == ?empty_tree; T == ?undef -> '$end_of_tree';
 next(#node{ root = Root
           , left = Left
@@ -142,6 +152,7 @@ next(#node{ root = Root
             end
     end.
 
+-spec prev(tree(), term()) -> '$end_of_tree' | {term(), term()}.
 prev(T, _) when T == ?empty_tree; T == ?undef -> '$end_of_tree';
 prev(#node{ root = Root
           , left = Left
@@ -163,6 +174,7 @@ prev(#node{ root = Root
             end
     end.
 
+-spec prev_traverse(tree()) -> [term()].
 prev_traverse(?undef) -> [];
 prev_traverse(#node{root = Root, left = ?undef, right = ?undef}) ->
     [Root];
@@ -173,6 +185,7 @@ prev_traverse(#node{root = Root, left = Left, right = ?undef}) ->
 prev_traverse(#node{root = Root, left = Left, right = Right}) ->
     [Root] ++ prev_traverse(Left) ++ prev_traverse(Right).
 
+-spec mid_traverse(tree()) -> [term()].
 mid_traverse(?undef) -> [];
 mid_traverse(#node{root = Root, left = Left, right = Right}) ->
     case {Left, Right} of
@@ -186,6 +199,7 @@ mid_traverse(#node{root = Root, left = Left, right = Right}) ->
             mid_traverse(Left) ++ [Root] ++ mid_traverse(Right)
     end.
 
+-spec last_traverse(tree()) -> [term()].
 last_traverse(?undef) -> [];
 last_traverse(#node{root = Root, left = Left, right = Right}) ->
     case {Left, Right} of
@@ -199,6 +213,7 @@ last_traverse(#node{root = Root, left = Left, right = Right}) ->
             last_traverse(Left) ++ last_traverse(Right) ++ [Root]
     end.
 
+-spec is_avl(tree()) -> boolean().
 is_avl(T) when T == ?empty_tree; T == ?undef -> true;
 is_avl(#node{left = Left, right = Right} = Tree) ->
     is_binarysearchtree(Tree)
