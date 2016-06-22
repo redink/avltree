@@ -24,12 +24,30 @@
 
 -module(compare_2_gbtrees).
 
--export([start/0, insert/2]).
+-export([start/0]).
+-export([insert/2, enter/2]).
 
 start() ->
-    L1 = [{X, a} || X <- lists:seq(1, 10000)],
-    {T1, Tree1} = timer:tc(avltree, new, [L1]),
-    {T2, Tree2} = timer:tc(?MODULE, insert, [gb_trees:empty(), L1]),
+    io:format("~p~n", [{sequential_write(),
+                        random_write(),
+                        random_read()}]).
+
+sequential_write() ->
+    L1 = [{X, a} || X <- lists:seq(10000, 1, -1)],
+    {T1, _Tree1} = timer:tc(avltree, new, [L1]),
+    {T2, _Tree2} = timer:tc(?MODULE, insert, [gb_trees:empty(), L1]),
+    {sequential_write, T1 / T2}.
+
+random_write() ->
+    L1 = [{rand:uniform(100000), a} || _ <- lists:seq(1, 100000)],
+    {T1, _Tree1} = timer:tc(avltree, new, [L1]),
+    {T2, _Tree2} = timer:tc(?MODULE, enter, [gb_trees:empty(), L1]),
+    {random_write, T1 / T2}.
+
+random_read() ->
+    L1 = [{rand:uniform(100000), a} || _ <- lists:seq(1, 100000)],
+    {_T1, Tree1} = timer:tc(avltree, new, [L1]),
+    {_T2, Tree2} = timer:tc(?MODULE, enter, [gb_trees:empty(), L1]),
     A1 =
         [begin
             X = rand:uniform(10000),
@@ -42,8 +60,12 @@ start() ->
             {X2, _} = timer:tc(gb_trees, lookup, [X, Tree2]),
             X2
          end || _ <- lists:seq(1, 100000)],
-    {{look, lists:sum(A1) / lists:sum(A2)},
-     {insert, T1 / T2}}.
+    {random_read, lists:sum(A1) / lists:sum(A2)}.
+
+enter(T, []) ->
+    T;
+enter(T, [{K, V} | Tail]) ->
+    enter(gb_trees:enter(K, V, T), Tail).
 
 insert(T, []) ->
     T;
